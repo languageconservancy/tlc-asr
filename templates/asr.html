@@ -1,0 +1,218 @@
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at https://mozilla.org/MPL/2.0/. -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Speech to Text</title>
+  <!-- jQuery (required by Bootstrap's JavaScript) -->
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+  
+  <!-- Your custom script -->
+  <script src="/js/asr.js"></script>
+  
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css" 
+        integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" 
+        crossorigin="anonymous">
+        
+  <!-- Optionally include Popper and Bootstrap JS if you need extra components (like tooltips, modals, etc.) -->
+  <!--
+  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.14.7/dist/umd/popper.min.js"
+          integrity="sha384-UO2eT0CpHrdlx+9OfT1hYO35hF7F5LMv20yJA8hPxzKhlZ+hvTeTnOh5306KGiGi"
+          crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/js/bootstrap.min.js"
+          integrity="sha384-JjSmV+gyOz9/1j0EnA4noAWishh4DcfeEexl8Yxa2f3cEnIXZMGpGm1fz4pG4Ol5"
+          crossorigin="anonymous"></script>
+  -->
+</head>
+<body class="bg-light">
+
+<div class="container py-5">
+  <h1 class="mb-4">Speech to Text</h1>
+  <h3 class="mb-4">Upload or Record Audio</h1>
+  <h5 class="mb-4">Current Model: {{ model }}</h1>
+
+  <!-- Upload Form -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <form id="upload-form" action="{{ url_for('upload') }}" method="POST" enctype="multipart/form-data">
+        <div class="form-group">
+          <label for="file-picker" class="font-weight-bold">Select Files</label>
+          <input id="file-picker" type="file" name="file" 
+                 accept="wav/*" multiple 
+                 class="form-control-file">
+          <small class="form-text text-muted">
+            You can select one or multiple .wav files.
+          </small>
+          <div id="msg" class="mt-2 text-info"></div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary" id="upload-button">
+          Upload!
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Recorder Section -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <h5 class="card-title">Or Record Directly</h5>
+      <p id="recorder" class="mb-0">
+        <button id="startRecording" class="btn btn-success">Start Recording</button>
+        <button id="stopRecording" class="btn btn-danger" disabled>Stop Recording</button>
+      </p>
+    </div>
+  </div>
+
+  <!-- Results / Information -->
+  {% if transcription %}
+  <div class="card mb-4">
+    <div class="card-body">
+      <h5 class="card-title">Result</h5>
+      <div id="result">
+        <p class="mb-1">{{file}}</p>
+        <p class="mb-1">
+          ASR Spelling: <strong>{{transcription}}</strong>
+        </p>
+      </div>
+      <hr>
+      <div class="mb-3" style="overflow-x: auto; border: 1px solid #dee2e6; padding: 1rem;">
+        <div id="prediction-container">
+            <div id="prediction" class="mb-3">
+            {{ prediction }}
+            </div>
+            <div id="waveform">
+            <p class="mb-1"><strong>Audio Waveform:</strong></p>
+            <!-- The waveform will be rendered here -->
+            </div>
+        </div>
+      </div>
+      <div id="logits">
+        <p class="mb-0"><strong>Logits:</strong> {{logits}}</p>
+      </div>
+    </div>
+  </div>
+  
+  {% endif %}
+
+</div> <!-- /container -->
+ <!-- Footer -->
+ <footer class="bg-white text-center text-muted py-3 mt-auto" style="border-top: 1px solid #dee2e6;">
+  <div class="container">
+    <small>
+      This software is released under the 
+      <a href="https://www.mozilla.org/en-US/MPL/2.0/" target="_blank">
+        Mozilla Public License 2.0
+      </a>.
+      &nbsp;|&nbsp; 
+      &copy; 2025 The Language Conservancy
+    </small>
+  </div>
+</footer>
+
+</body>
+<script type="module">
+    import WaveSurfer from 'https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.esm.js'
+    import Spectrogram from 'https://unpkg.com/wavesurfer.js@7/dist/plugins/spectrogram.esm.js'
+    
+    const wavesurfer = WaveSurfer.create({
+      container: '#waveform',
+      waveColor: '#4F4A85',
+      progressColor: '#383351',
+      url: '{{ url_for('download', filename=file) }}',
+    })
+
+    wavesurfer.registerPlugin(
+      Spectrogram.create({
+        labels: true,
+        height: 200,
+        splitChannels: false,
+      }),
+    )
+    
+    wavesurfer.on('interaction', () => {
+      wavesurfer.play()
+    })
+</script>
+<script>
+    
+    $("#file-picker").change(function(){
+
+        var input = document.getElementById('file-picker');
+
+        for (var i=0; i<input.files.length; i++)
+        {
+        //koala.jpg, koala.JPG substring(index) lastIndexOf('a') koala.1.jpg
+            var ext= input.files[i].name.substring(input.files[i].name.lastIndexOf('.')+1).toLowerCase()
+
+            if ((ext == 'wav'))
+            {
+                $("#msg").text("Files are supported")
+            }
+            else
+            {
+                $("#msg").text("Files are NOT supported")
+                document.getElementById("file-picker").value ="";
+            }
+
+        }
+
+
+    } );
+
+     navigator
+        .mediaDevices
+        .getUserMedia({audio: true})
+        .then(stream => { handlerFunction(stream) });
+
+    function handlerFunction(stream) {
+        rec = new MediaRecorder(stream);
+        rec.ondataavailable = e => {
+            audioChunks.push(e.data);
+            if (rec.state == "inactive") {
+                let blob = new Blob(audioChunks, {type: 'audio/wav'});
+                sendData(blob);
+            }
+        }
+    }
+
+    function sendData(data) {
+        var form = new FormData();
+        form.append('file', data, 'data.wav');
+        form.append('title', 'data.wav');
+        //Chrome inspector shows that the post data includes a file and a title.
+        $.ajax({
+            type: 'POST',
+            url: '/save-record',
+            data: form,
+            cache: false,
+            processData: false,
+            contentType: false
+        }).done(function(data) {
+            var newDoc = document.open("text/html", "replace");
+            newDoc.write(data);
+            newDoc.close();
+        });
+    }
+
+    startRecording.onclick = e => {
+        console.log('Recording are started..');
+        startRecording.disabled = true;
+        stopRecording.disabled = false;
+        audioChunks = [];
+        rec.start();
+    };
+
+    stopRecording.onclick = e => {
+        console.log("Recording are stopped.");
+        startRecording.disabled = false;
+        stopRecording.disabled = true;
+        rec.stop();
+    };
+
+</script>
+</html>
