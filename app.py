@@ -95,6 +95,7 @@ def save_record():
     prediction = torch.argmax(logits, dim = -1)
     transcription = tokenizer.batch_decode(prediction)[0]
     print(transcription)
+    print(logits[0])
     return render_template("asr.html", model=model_name, file=filename, transcription=transcription, prediction=prediction[0], logits=logits)
 
 
